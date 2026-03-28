@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM Brevet Booster</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f8f9fb;--surface:#fff;--surface2:#f1f3f6;--border:#e2e5ea;
+  --text:#1a1d23;--text2:#6b7280;--accent:#2563eb;--accentLight:#eff4ff;
+  --jour1:#16a34a;--jour1bg:#f0fdf4;
+  --jour2:#7c3aed;--jour2bg:#f5f3ff;
+  --jour3:#d97706;--jour3bg:#fffbeb;
+  --diag:#dc2626;--diagbg:#fef2f2;
+  --relance1:#0891b2;--relance1bg:#ecfeff;
+  --relance2:#db2777;--relance2bg:#fdf2f8;
+  --won:#059669;--wonbg:#ecfdf5;
+  --lost:#6b7280;--lostbg:#f3f4f6;
+  --ciao:#f97316;--ciaobg:#fff7ed;
+  --radius:10px;--shadow:0 1px 3px rgba(0,0,0,.06);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;overflow:hidden}
+.header{padding:16px 24px;display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-bottom:1px solid var(--border)}
+.header h1{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#d1d5db;transition:.3s}
+.sync-dot.live{background:var(--jour1);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.stats{display:flex;gap:24px}
+.stat-val{font-size:20px;font-weight:700;color:var(--accent)}
+.stat-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+.tabs{display:flex;gap:0;background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px}
+.tab{padding:10px 16px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:.15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-color:var(--accent);font-weight:600}
+.toolbar{padding:12px 24px;display:flex;align-items:center;gap:10px}
+.search-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:7px 12px;color:var(--text);font-size:13px;width:240px;outline:none;transition:.15s}
+.search-box:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accentLight)}
+.btn{padding:7px 14px;border-radius:var(--radius);border:none;font-size:13px;font-weight:600;cursor:pointer;transition:.1s;font-family:inherit}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#1d4ed8}
+.btn-ghost{background:var(--surface);color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--surface2)}
+.pipeline-wrapper{position:relative;flex:1;overflow:hidden}
+.scroll-btn{position:absolute;top:50%;transform:translateY(-50%);z-index:10;width:36px;height:36px;border-radius:50%;background:var(--surface);border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,.1);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text2);transition:.15s}
+.scroll-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.scroll-btn.left{left:8px}
+.scroll-btn.right{right:8px}
+.scroll-btn.hidden{opacity:0;pointer-events:none}
+.pipeline{display:flex;gap:12px;padding:4px 24px 24px;overflow-x:auto;height:calc(100vh - 170px);cursor:grab;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.pipeline:active{cursor:grabbing}
+.pipeline::-webkit-scrollbar{height:6px}
+.pipeline::-webkit-scrollbar-track{background:transparent}
+.pipeline::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.pipeline::-webkit-scrollbar-thumb:hover{background:var(--text2)}
+.column{min-width:250px;max-width:250px;flex-shrink:0;background:var(--surface2);border-radius:var(--radius);display:flex;flex-direction:column;max-height:100%}
+.column.drag-over{outline:2px solid var(--accent);outline-offset:-2px}
+.col-header{padding:12px 14px;display:flex;align-items:center;justify-content:space-between}
+.col-title{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--text2)}
+.col-dot{width:8px;height:8px;border-radius:50%}
+.col-count{font-size:11px;font-weight:600;color:var(--text2);background:var(--surface);padding:1px 7px;border-radius:8px}
+.col-body{padding:0 6px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px;min-height:40px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:grab;transition:.12s;box-shadow:var(--shadow)}
+.card:hover{border-color:var(--accent);box-shadow:0 2px 8px rgba(37,99,235,.1)}
+.card:active{cursor:grabbing}
+.card.dragging{opacity:.35}
+.card-name{font-size:13px;font-weight:600}
+.card-phone{font-size:12px;color:var(--text2);margin-top:2px}
+.card-email{font-size:11px;color:var(--accent);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.add-card-btn{margin:4px 6px 8px;padding:6px;background:transparent;border:1px dashed var(--border);border-radius:8px;color:var(--text2);font-size:12px;cursor:pointer;transition:.1s;font-family:inherit}
+.add-card-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accentLight)}
+.table-view{padding:0 24px 24px;display:none;overflow:auto;height:calc(100vh - 170px)}
+.table-view.active{display:block}
+.pipeline-wrapper.active{display:block}
+table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--border)}
+th{text-align:left;padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);background:var(--surface2);font-weight:600;position:sticky;top:0;z-index:1}
+td{padding:9px 14px;font-size:13px;border-top:1px solid var(--border)}
+tr:hover td{background:var(--accentLight)}
+.stage-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border-radius:14px;width:420px;max-width:92vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal-head{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-head h2{font-size:15px;font-weight:700}
+.close-btn{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px}
+.close-btn:hover{background:var(--surface2)}
+.modal-body{padding:20px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500}
+.field input,.field select,.field textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:.15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accentLight)}
+.field textarea{resize:vertical;min-height:56px}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.btn-danger{background:#fef2f2;color:#dc2626;border:none;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-danger:hover{background:#fee2e2}
+.loading{display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text2);font-size:14px}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--text);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;opacity:0;transition:.3s;z-index:200;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1><div class="sync-dot" id="syncDot"></div> CRM Brevet Booster</h1>
+  <div class="stats">
+    <div class="stat"><div class="stat-val" id="totalCount">0</div><div class="stat-label">Prospects</div></div>
+    <div class="stat"><div class="stat-val" id="wonCount">0</div><div class="stat-label">Signés</div></div>
+  </div>
+</div>
+<div class="tabs">
+  <div class="tab active" data-view="pipeline">Pipeline</div>
+  <div class="tab" data-view="table">Tableau</div>
+</div>
+<div class="toolbar">
+  <input class="search-box" type="text" placeholder="Rechercher..." id="searchInput">
+  <button class="btn btn-primary" onclick="openAddModal()">+ Nouveau</button>
+  <button class="btn btn-ghost" onclick="exportData()">Exporter CSV</button>
+</div>
+<div class="pipeline-wrapper active" id="pipelineWrapper">
+  <button class="scroll-btn left hidden" id="scrollLeft" onclick="scrollPipeline(-300)">◀</button>
+  <button class="scroll-btn right" id="scrollRight" onclick="scrollPipeline(300)">▶</button>
+  <div class="pipeline" id="pipelineView"><div class="loading">Connexion à la base...</div></div>
+</div>
+<div class="table-view" id="tableView">
+  <table><thead><tr><th>Nom</th><th>Téléphone</th><th>Email</th><th>Étape</th><th>Notes</th></tr></thead><tbody id="tableBody"></tbody></table>
+</div>
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-head"><h2 id="modalTitle">Prospect</h2><button class="close-btn" onclick="closeModal()">&times;</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nom</label><input id="mName"></div>
+      <div class="field"><label>Téléphone</label><input id="mPhone" type="tel"></div>
+      <div class="field"><label>Email</label><input id="mEmail" type="email"></div>
+      <div class="field"><label>Étape</label><select id="mStage"></select></div>
+      <div class="field"><label>Notes</label><textarea id="mNotes"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-danger" id="deleteBtn" onclick="deleteProspect()">Supprimer</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveModal()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL='https://xzwobtttkxteqighnspz.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6d29idHR0a3h0ZXFpZ2huc3B6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MjE0MDIsImV4cCI6MjA5MDA5NzQwMn0.stdRFDGEDzt4VP4nynha4EW6K6yYGZKO8_zt6Wt8Pn4';
+const{createClient}=window.supabase;
+const db=createClient(SUPABASE_URL,SUPABASE_KEY);
+
+const STAGES=[
+  {id:'jour1',label:'Jour 1',color:'var(--jour1)',bg:'var(--jour1bg)'},
+  {id:'jour2',label:'Jour 2',color:'var(--jour2)',bg:'var(--jour2bg)'},
+  {id:'jour3',label:'Jour 3',color:'var(--jour3)',bg:'var(--jour3bg)'},
+  {id:'appel_diag',label:'Appel Diag',color:'var(--diag)',bg:'var(--diagbg)'},
+  {id:'relance_m1',label:'Relance M1',color:'var(--relance1)',bg:'var(--relance1bg)'},
+  {id:'relance_stage',label:'Relance Stage',color:'var(--relance2)',bg:'var(--relance2bg)'},
+  {id:'won',label:'Signé ✓',color:'var(--won)',bg:'var(--wonbg)'},
+  {id:'lost',label:'Perdu',color:'var(--lost)',bg:'var(--lostbg)'},
+  {id:'ciao',label:"C'est ciao",color:'var(--ciao)',bg:'var(--ciaobg)'}
+];
+
+let prospects=[],editingId=null,dragId=null;
+
+// ── GRAB TO SCROLL ──
+const pipeline=document.getElementById('pipelineView');
+let isDown=false,startX,scrollLeftPos;
+pipeline.addEventListener('mousedown',e=>{if(e.target.closest('.card,.add-card-btn,.btn'))return;isDown=true;pipeline.style.cursor='grabbing';startX=e.pageX-pipeline.offsetLeft;scrollLeftPos=pipeline.scrollLeft});
+pipeline.addEventListener('mouseleave',()=>{isDown=false;pipeline.style.cursor='grab'});
+pipeline.addEventListener('mouseup',()=>{isDown=false;pipeline.style.cursor='grab'});
+pipeline.addEventListener('mousemove',e=>{if(!isDown)return;e.preventDefault();const x=e.pageX-pipeline.offsetLeft;pipeline.scrollLeft=scrollLeftPos-(x-startX)*1.5});
+function updateScrollBtns(){const el=pipeline;document.getElementById('scrollLeft').classList.toggle('hidden',el.scrollLeft<10);document.getElementById('scrollRight').classList.toggle('hidden',el.scrollLeft>=el.scrollWidth-el.clientWidth-10)}
+pipeline.addEventListener('scroll',updateScrollBtns);
+window.addEventListener('resize',updateScrollBtns);
+function scrollPipeline(amount){pipeline.scrollBy({left:amount,behavior:'smooth'})}
+
+// ── SUPABASE ──
+async function fetchAll(){
+  try{const{data,error}=await db.from('prospects').select('*').order('created_at',{ascending:true});if(error)throw error;prospects=data||[];document.getElementById('syncDot').classList.add('live');render(document.getElementById('searchInput').value);setTimeout(updateScrollBtns,100)}
+  catch(e){document.getElementById('pipelineView').innerHTML='<div class="loading">Erreur : '+e.message+'</div>'}
+}
+async function insertProspect(p){const{data,error}=await db.from('prospects').insert([{name:p.name,phone:p.phone,email:p.email,stage:p.stage,notes:p.notes}]).select();if(error){toast('Erreur : '+error.message);return null}return data[0]}
+async function updateProspect(id,updates){updates.updated_at=new Date().toISOString();const{error}=await db.from('prospects').update(updates).eq('id',id);if(error)toast('Erreur : '+error.message)}
+async function removeProspect(id){const{error}=await db.from('prospects').delete().eq('id',id);if(error)toast('Erreur : '+error.message)}
+
+// ── REALTIME ──
+db.channel('prospects-realtime').on('postgres_changes',{event:'*',schema:'public',table:'prospects'},payload=>{
+  if(payload.eventType==='INSERT'){if(!prospects.find(p=>p.id===payload.new.id)){prospects.push(payload.new);toast(payload.new.name+' ajouté')}}
+  else if(payload.eventType==='UPDATE'){const idx=prospects.findIndex(p=>p.id===payload.new.id);if(idx>=0)prospects[idx]=payload.new}
+  else if(payload.eventType==='DELETE'){prospects=prospects.filter(p=>p.id!==payload.old.id)}
+  render(document.getElementById('searchInput').value);
+}).subscribe();
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+
+// ── RENDER ──
+function initStageSelect(){document.getElementById('mStage').innerHTML=STAGES.map(s=>`<option value="${s.id}">${s.label}</option>`).join('')}
+function render(filter=''){
+  const f=filter.toLowerCase();
+  const list=f?prospects.filter(p=>p.name.toLowerCase().includes(f)||(p.phone||'').includes(f)||(p.email||'').toLowerCase().includes(f)):prospects;
+  document.getElementById('pipelineView').innerHTML=STAGES.map(s=>{
+    const cards=list.filter(p=>p.stage===s.id);
+    return `<div class="column" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'${s.id}')">
+      <div class="col-header"><div class="col-title"><div class="col-dot" style="background:${s.color}"></div>${s.label}</div><div class="col-count">${cards.length}</div></div>
+      <div class="col-body">${cards.map(p=>`<div class="card" draggable="true" ondragstart="onDragStart(event,'${p.id}')" ondragend="onDragEnd(event)" onclick="openDetail('${p.id}')">
+        <div class="card-name">${esc(p.name)}</div>
+        ${p.phone?`<div class="card-phone">${esc(p.phone)}</div>`:''}
+        ${p.email?`<div class="card-email">${esc(p.email)}</div>`:''}
+      </div>`).join('')}</div>
+      <button class="add-card-btn" onclick="quickAdd('${s.id}')">+ Ajouter</button>
+    </div>`}).join('');
+  document.getElementById('tableBody').innerHTML=list.map(p=>{
+    const s=STAGES.find(x=>x.id===p.stage);
+    return `<tr onclick="openDetail('${p.id}')" style="cursor:pointer">
+      <td style="font-weight:600">${esc(p.name)}</td>
+      <td style="font-size:12px;color:var(--text2)">${esc(p.phone)}</td>
+      <td style="font-size:12px">${esc(p.email)}</td>
+      <td><span class="stage-badge" style="background:${s.bg};color:${s.color}">${s.label}</span></td>
+      <td style="color:var(--text2);font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.notes)}</td>
+    </tr>`}).join('');
+  document.getElementById('totalCount').textContent=prospects.length;
+  document.getElementById('wonCount').textContent=prospects.filter(p=>p.stage==='won').length;
+  setTimeout(updateScrollBtns,50);
+}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// ── DRAG & DROP ──
+function onDragStart(e,id){dragId=id;e.target.classList.add('dragging');e.dataTransfer.effectAllowed='move'}
+function onDragEnd(e){e.target.classList.remove('dragging');dragId=null}
+function onDragOver(e){e.preventDefault();e.currentTarget.classList.add('drag-over')}
+function onDragLeave(e){e.currentTarget.classList.remove('drag-over')}
+async function onDrop(e,stageId){e.preventDefault();e.currentTarget.classList.remove('drag-over');if(!dragId)return;const p=prospects.find(x=>x.id===dragId);if(p&&p.stage!==stageId){p.stage=stageId;render(document.getElementById('searchInput').value);await updateProspect(dragId,{stage:stageId})}}
+
+// ── MODAL ──
+function openDetail(id){editingId=id;const p=prospects.find(x=>x.id===id);if(!p)return;document.getElementById('modalTitle').textContent=p.name||'Prospect';document.getElementById('mName').value=p.name||'';document.getElementById('mPhone').value=p.phone||'';document.getElementById('mEmail').value=p.email||'';document.getElementById('mStage').value=p.stage;document.getElementById('mNotes').value=p.notes||'';document.getElementById('deleteBtn').style.display='';document.getElementById('modal').classList.add('show')}
+function openAddModal(){editingId=null;document.getElementById('modalTitle').textContent='Nouveau prospect';['mName','mPhone','mEmail','mNotes'].forEach(id=>document.getElementById(id).value='');document.getElementById('mStage').value='jour1';document.getElementById('deleteBtn').style.display='none';document.getElementById('modal').classList.add('show')}
+function closeModal(){document.getElementById('modal').classList.remove('show')}
+async function saveModal(){const name=document.getElementById('mName').value.trim();if(!name)return;const data={name,phone:document.getElementById('mPhone').value.trim(),email:document.getElementById('mEmail').value.trim(),stage:document.getElementById('mStage').value,notes:document.getElementById('mNotes').value.trim()};if(editingId){const p=prospects.find(x=>x.id===editingId);if(p)Object.assign(p,data);render(document.getElementById('searchInput').value);await updateProspect(editingId,data)}else{const ins=await insertProspect(data);if(ins){prospects.push(ins);render(document.getElementById('searchInput').value)}}closeModal()}
+async function deleteProspect(){if(!editingId||!confirm('Supprimer ce prospect ?'))return;prospects=prospects.filter(p=>p.id!==editingId);render(document.getElementById('searchInput').value);await removeProspect(editingId);closeModal()}
+async function quickAdd(stageId){const name=prompt('Nom du prospect :');if(!name)return;const ins=await insertProspect({name,phone:'',email:'',stage:stageId,notes:''});if(ins){prospects.push(ins);render(document.getElementById('searchInput').value)}}
+function exportData(){const rows=['Nom,Téléphone,Email,Étape,Notes',...prospects.map(p=>`"${p.name}","${p.phone||''}","${p.email||''}","${STAGES.find(s=>s.id===p.stage).label}","${p.notes||''}"`)];const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));a.download='crm_brevet_booster.csv';a.click()}
+
+// ── TABS ──
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');const v=t.dataset.view;document.getElementById('pipelineWrapper').classList.toggle('active',v==='pipeline');document.getElementById('tableView').classList.toggle('active',v==='table')}));
+document.getElementById('searchInput').addEventListener('input',e=>render(e.target.value));
+document.getElementById('modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal()});
+initStageSelect();fetchAll();
+</script>
+</body>
+</html>
