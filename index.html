@@ -14,6 +14,7 @@
   --jour2:#7c3aed;--jour2bg:#f5f3ff;
   --jour3:#d97706;--jour3bg:#fffbeb;
   --diag:#dc2626;--diagbg:#fef2f2;
+  --noshow:#b91c1c;--noshowbg:#fef2f2;
   --relance1:#0891b2;--relance1bg:#ecfeff;
   --relance2:#db2777;--relance2bg:#fdf2f8;
   --won:#059669;--wonbg:#ecfdf5;
@@ -154,6 +155,7 @@ const STAGES=[
   {id:'jour2',label:'Jour 2',color:'var(--jour2)',bg:'var(--jour2bg)'},
   {id:'jour3',label:'Jour 3',color:'var(--jour3)',bg:'var(--jour3bg)'},
   {id:'appel_diag',label:'Appel Diag',color:'var(--diag)',bg:'var(--diagbg)'},
+  {id:'noshow',label:'No-show',color:'var(--noshow)',bg:'var(--noshowbg)'},
   {id:'relance_m1',label:'Relance M1',color:'var(--relance1)',bg:'var(--relance1bg)'},
   {id:'relance_stage',label:'Relance Stage',color:'var(--relance2)',bg:'var(--relance2bg)'},
   {id:'won',label:'Signé ✓',color:'var(--won)',bg:'var(--wonbg)'},
@@ -163,7 +165,6 @@ const STAGES=[
 
 let prospects=[],editingId=null,dragId=null;
 
-// ── GRAB TO SCROLL ──
 const pipeline=document.getElementById('pipelineView');
 let isDown=false,startX,scrollLeftPos;
 pipeline.addEventListener('mousedown',e=>{if(e.target.closest('.card,.add-card-btn,.btn'))return;isDown=true;pipeline.style.cursor='grabbing';startX=e.pageX-pipeline.offsetLeft;scrollLeftPos=pipeline.scrollLeft});
@@ -175,7 +176,6 @@ pipeline.addEventListener('scroll',updateScrollBtns);
 window.addEventListener('resize',updateScrollBtns);
 function scrollPipeline(amount){pipeline.scrollBy({left:amount,behavior:'smooth'})}
 
-// ── SUPABASE ──
 async function fetchAll(){
   try{const{data,error}=await db.from('prospects').select('*').order('created_at',{ascending:true});if(error)throw error;prospects=data||[];document.getElementById('syncDot').classList.add('live');render(document.getElementById('searchInput').value);setTimeout(updateScrollBtns,100)}
   catch(e){document.getElementById('pipelineView').innerHTML='<div class="loading">Erreur : '+e.message+'</div>'}
@@ -184,7 +184,6 @@ async function insertProspect(p){const{data,error}=await db.from('prospects').in
 async function updateProspect(id,updates){updates.updated_at=new Date().toISOString();const{error}=await db.from('prospects').update(updates).eq('id',id);if(error)toast('Erreur : '+error.message)}
 async function removeProspect(id){const{error}=await db.from('prospects').delete().eq('id',id);if(error)toast('Erreur : '+error.message)}
 
-// ── REALTIME ──
 db.channel('prospects-realtime').on('postgres_changes',{event:'*',schema:'public',table:'prospects'},payload=>{
   if(payload.eventType==='INSERT'){if(!prospects.find(p=>p.id===payload.new.id)){prospects.push(payload.new);toast(payload.new.name+' ajouté')}}
   else if(payload.eventType==='UPDATE'){const idx=prospects.findIndex(p=>p.id===payload.new.id);if(idx>=0)prospects[idx]=payload.new}
@@ -194,7 +193,6 @@ db.channel('prospects-realtime').on('postgres_changes',{event:'*',schema:'public
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
 
-// ── RENDER ──
 function initStageSelect(){document.getElementById('mStage').innerHTML=STAGES.map(s=>`<option value="${s.id}">${s.label}</option>`).join('')}
 function render(filter=''){
   const f=filter.toLowerCase();
@@ -216,7 +214,7 @@ function render(filter=''){
       <td style="font-weight:600">${esc(p.name)}</td>
       <td style="font-size:12px;color:var(--text2)">${esc(p.phone)}</td>
       <td style="font-size:12px">${esc(p.email)}</td>
-      <td><span class="stage-badge" style="background:${s.bg};color:${s.color}">${s.label}</span></td>
+      <td><span class="stage-badge" style="background:${s?s.bg:'#f3f4f6'};color:${s?s.color:'#6b7280'}">${s?s.label:p.stage}</span></td>
       <td style="color:var(--text2);font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.notes)}</td>
     </tr>`}).join('');
   document.getElementById('totalCount').textContent=prospects.length;
@@ -225,23 +223,20 @@ function render(filter=''){
 }
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
-// ── DRAG & DROP ──
 function onDragStart(e,id){dragId=id;e.target.classList.add('dragging');e.dataTransfer.effectAllowed='move'}
 function onDragEnd(e){e.target.classList.remove('dragging');dragId=null}
 function onDragOver(e){e.preventDefault();e.currentTarget.classList.add('drag-over')}
 function onDragLeave(e){e.currentTarget.classList.remove('drag-over')}
 async function onDrop(e,stageId){e.preventDefault();e.currentTarget.classList.remove('drag-over');if(!dragId)return;const p=prospects.find(x=>x.id===dragId);if(p&&p.stage!==stageId){p.stage=stageId;render(document.getElementById('searchInput').value);await updateProspect(dragId,{stage:stageId})}}
 
-// ── MODAL ──
 function openDetail(id){editingId=id;const p=prospects.find(x=>x.id===id);if(!p)return;document.getElementById('modalTitle').textContent=p.name||'Prospect';document.getElementById('mName').value=p.name||'';document.getElementById('mPhone').value=p.phone||'';document.getElementById('mEmail').value=p.email||'';document.getElementById('mStage').value=p.stage;document.getElementById('mNotes').value=p.notes||'';document.getElementById('deleteBtn').style.display='';document.getElementById('modal').classList.add('show')}
 function openAddModal(){editingId=null;document.getElementById('modalTitle').textContent='Nouveau prospect';['mName','mPhone','mEmail','mNotes'].forEach(id=>document.getElementById(id).value='');document.getElementById('mStage').value='jour1';document.getElementById('deleteBtn').style.display='none';document.getElementById('modal').classList.add('show')}
 function closeModal(){document.getElementById('modal').classList.remove('show')}
 async function saveModal(){const name=document.getElementById('mName').value.trim();if(!name)return;const data={name,phone:document.getElementById('mPhone').value.trim(),email:document.getElementById('mEmail').value.trim(),stage:document.getElementById('mStage').value,notes:document.getElementById('mNotes').value.trim()};if(editingId){const p=prospects.find(x=>x.id===editingId);if(p)Object.assign(p,data);render(document.getElementById('searchInput').value);await updateProspect(editingId,data)}else{const ins=await insertProspect(data);if(ins){prospects.push(ins);render(document.getElementById('searchInput').value)}}closeModal()}
 async function deleteProspect(){if(!editingId||!confirm('Supprimer ce prospect ?'))return;prospects=prospects.filter(p=>p.id!==editingId);render(document.getElementById('searchInput').value);await removeProspect(editingId);closeModal()}
 async function quickAdd(stageId){const name=prompt('Nom du prospect :');if(!name)return;const ins=await insertProspect({name,phone:'',email:'',stage:stageId,notes:''});if(ins){prospects.push(ins);render(document.getElementById('searchInput').value)}}
-function exportData(){const rows=['Nom,Téléphone,Email,Étape,Notes',...prospects.map(p=>`"${p.name}","${p.phone||''}","${p.email||''}","${STAGES.find(s=>s.id===p.stage).label}","${p.notes||''}"`)];const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));a.download='crm_brevet_booster.csv';a.click()}
+function exportData(){const rows=['Nom,Téléphone,Email,Étape,Notes',...prospects.map(p=>`"${p.name}","${p.phone||''}","${p.email||''}","${STAGES.find(s=>s.id===p.stage)?.label||p.stage}","${p.notes||''}"`)];const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));a.download='crm_brevet_booster.csv';a.click()}
 
-// ── TABS ──
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');const v=t.dataset.view;document.getElementById('pipelineWrapper').classList.toggle('active',v==='pipeline');document.getElementById('tableView').classList.toggle('active',v==='table')}));
 document.getElementById('searchInput').addEventListener('input',e=>render(e.target.value));
 document.getElementById('modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal()});
